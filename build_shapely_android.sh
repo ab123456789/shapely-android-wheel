@@ -2,6 +2,69 @@
 set -euo pipefail
 python3 -V
 pip3 --version
-python3 -m pip install -U pip wheel setuptools build packaging Cython numpy
-python3 -m pip wheel --no-deps --wheel-dir dist Shapely==2.1.2
-ls -lah dist
+
+ROOT="$PWD/.work"
+PREFIX="$ROOT/prefix"
+mkdir -p "$ROOT" "$PREFIX" dist
+
+python3 -m pip install -U pip wheel setuptools build packaging Cython
+python3 -m pip download --no-binary=:all: --no-deps shapely==2.1.2 -d "$ROOT/src"
+python3 -m pip download --no-binary=:all: --no-deps numpy==2.4.4 -d "$ROOT/src"
+
+cd "$ROOT"
+if [ ! -d geos-src ]; then
+  git clone --depth=1 --branch 3.12.2 https://github.com/libgeos/geos.git geos-src
+fi
+
+export ANDROID_NDK="${ANDROID_NDK:?}"
+TOOLCHAIN="$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64"
+export TARGET=aarch64-linux-android
+export API="${ANDROID_API:-24}"
+export CC="$TOOLCHAIN/bin/${TARGET}${API}-clang"
+export CXX="$TOOLCHAIN/bin/${TARGET}${API}-clang++"
+export AR="$TOOLCHAIN/bin/llvm-ar"
+export RANLIB="$TOOLCHAIN/bin/llvm-ranlib"
+export STRIP="$TOOLCHAIN/bin/llvm-strip"
+export CFLAGS="-fPIC"
+export CXXFLAGS="-fPIC"
+export LDFLAGS=""
+
+cd geos-src
+cmake -S . -B build-android -G Ninja \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_TOOLCHAIN_FILE="$ANDROID_NDK/build/cmake/android.toolchain.cmake" \
+  -DANDROID_ABI="${ANDROID_ABI:-arm64-v8a}" \
+  -DANDROID_PLATFORM="android-${API}" \
+  -DBUILD_SHARED_LIBS=ON \
+  -DCMAKE_INSTALL_PREFIX="$PREFIX" \
+  -DBUILD_TESTING=OFF
+cmake --build build-android --parallel
+cmake --install build-android
+
+cd "$ROOT"
+rm -rf shapely-src
+mkdir shapely-src
+unzip -q "$ROOT/src/shapely-2.1.2.zip" -d shapely-src || true
+if [ ! -d shapely-src/shapely-2.1.2 ]; then
+  tar -xf "$ROOT/src/shapely-2.1.2.tar.gz" -C shapely-src
+fi
+cd shapely-src/shapely-2.1.2
+
+cat > setup.cfg <<EOF
+[build_ext]
+include_dirs=$PREFIX/include
+library_dirs=$PREFIX/lib
+rpath=$PREFIX/lib
+EOF
+
+export GEOS_CONFIG="$PREFIX/bin/geos-config"
+export GEOS_INCLUDE_PATH="$PREFIX/include"
+export GEOS_LIBRARY_PATH="$PREFIX/lib/libgeos_c.so"
+export SHAPELY_GEOS_LIBRARY_PATH="$PREFIX/lib/libgeos_c.so"
+export SHAPELY_GEOS_INCLUDE_PATH="$PREFIX/include"
+
+python3 -m pip wheel --no-deps --no-build-isolation -w "$PWD/dist-host" . || true
+ls -lah "$PWD/dist-host" || true
+
+echo 'NOTE: current workflow is cross-build scaffolding; verify output tags in logs.'
+find "$PWD/dist-host" -maxdepth 1 -type f -name '*.whl' -print -exec cp -f {} "$GITHUB_WORKSPACE/dist/" \;
