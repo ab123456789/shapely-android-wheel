@@ -5,7 +5,7 @@ pip3 --version
 
 ROOT="$PWD/.work"
 PREFIX="$ROOT/prefix"
-mkdir -p "$ROOT" "$PREFIX" dist
+mkdir -p "$ROOT" "$PREFIX" dist "$ROOT/src"
 
 python3 -m pip install -U pip wheel setuptools build packaging Cython numpy
 python3 -m pip download --no-binary=:all: --no-deps shapely==2.1.2 -d "$ROOT/src"
@@ -43,19 +43,35 @@ cmake --install build-android
 
 cd "$ROOT"
 rm -rf shapely-src
-mkdir shapely-src
-unzip -q "$ROOT/src/shapely-2.1.2.zip" -d shapely-src || true
-if [ ! -d shapely-src/shapely-2.1.2 ]; then
-  tar -xf "$ROOT/src/shapely-2.1.2.tar.gz" -C shapely-src
+mkdir -p shapely-src
+SHAPELY_TGZ=$(find "$ROOT/src" -maxdepth 1 -type f -name 'shapely-2.1.2*.tar.gz' | head -n1)
+if [ -z "$SHAPELY_TGZ" ]; then
+  echo 'Shapely source tar.gz not found' >&2
+  exit 1
 fi
+tar -xzf "$SHAPELY_TGZ" -C shapely-src
 cd shapely-src/shapely-2.1.2
 
-cat > setup.cfg <<EOF
-[build_ext]
-include_dirs=$PREFIX/include
-library_dirs=$PREFIX/lib
-rpath=$PREFIX/lib
-EOF
+test -f setup.py
+test -f setup.cfg
+test -f versioneer.py
+grep -q '^\[versioneer\]' setup.cfg
+
+python3 - <<PY
+from pathlib import Path
+cfg = Path('setup.cfg')
+text = cfg.read_text()
+if '[build_ext]' not in text:
+    text += '\n[build_ext]\n'
+for line in [
+    'include_dirs=$PREFIX/include',
+    'library_dirs=$PREFIX/lib',
+    'rpath=$PREFIX/lib',
+]:
+    if line not in text:
+        text += line + '\n'
+cfg.write_text(text)
+PY
 
 export GEOS_CONFIG="$PREFIX/bin/geos-config"
 export GEOS_INCLUDE_PATH="$PREFIX/include"
