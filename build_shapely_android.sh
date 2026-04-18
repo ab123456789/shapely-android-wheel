@@ -27,11 +27,8 @@ export RANLIB="$TOOLCHAIN/bin/llvm-ranlib"
 export STRIP="$TOOLCHAIN/bin/llvm-strip"
 export CFLAGS="-fPIC"
 export CXXFLAGS="-fPIC"
-export PYLIB="$(python3 - <<'PY'
-import sysconfig
-print(sysconfig.get_config_var('LIBDIR') + '/' + sysconfig.get_config_var('LDLIBRARY'))
-PY
-)"
+export PY_PREFIX="/data/data/app.botdrop/files/usr"
+export PYLIB="$ROOT/python-runtime/libpython3.13.so"
 export LDFLAGS="-L$PREFIX/lib -L$(dirname "$PYLIB") -lpython3.13 -Wl,-rpath,\$ORIGIN/.libs -Wl,-rpath,\$ORIGIN/shapely.libs -Wl,-rpath,\$ORIGIN"
 
 cd geos-src
@@ -48,9 +45,16 @@ cmake -S . -B build-android -G Ninja \
 cmake --build build-android --parallel
 cmake --install build-android
 
-mkdir -p "$PREFIX/lib/shapely.libs"
+mkdir -p "$PREFIX/lib/shapely.libs" "$ROOT/python-runtime"
 cp -f "$PREFIX/lib/libgeos.so" "$PREFIX/lib/shapely.libs/libgeos.so"
 cp -f "$PREFIX/lib/libgeos_c.so" "$PREFIX/lib/shapely.libs/libgeos_c.so"
+curl -fsSL "https://github.com/ab123456789/opencv-android-headless/releases/download/python-runtime-py313-android-aarch64/libpython3.13.so" -o "$PYLIB" || true
+if [ ! -s "$PYLIB" ]; then
+  curl -fsSL "https://github.com/ab123456789/opencv-android-headless/releases/download/python-runtime-py313-android-aarch64/libpython3.13.so.gz" -o "$PYLIB.gz"
+  gzip -df "$PYLIB.gz"
+fi
+test -s "$PYLIB"
+file "$PYLIB"
 
 export LDFLAGS="-L$PREFIX/lib -L$(dirname "$PYLIB") -lpython3.13 -Wl,-rpath,\$ORIGIN/.libs -Wl,-rpath,\$ORIGIN/shapely.libs -Wl,-rpath,\$ORIGIN"
 
