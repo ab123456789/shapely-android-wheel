@@ -27,7 +27,12 @@ export RANLIB="$TOOLCHAIN/bin/llvm-ranlib"
 export STRIP="$TOOLCHAIN/bin/llvm-strip"
 export CFLAGS="-fPIC"
 export CXXFLAGS="-fPIC"
-export LDFLAGS=""
+export PYLIB="$(python3 - <<'PY'
+import sysconfig
+print(sysconfig.get_config_var('LIBDIR') + '/' + sysconfig.get_config_var('LDLIBRARY'))
+PY
+)"
+export LDFLAGS="-L$PREFIX/lib -L$(dirname "$PYLIB") -lpython3.13 -Wl,-rpath,\$ORIGIN/.libs -Wl,-rpath,\$ORIGIN/shapely.libs -Wl,-rpath,\$ORIGIN"
 
 cd geos-src
 cmake -S . -B build-android -G Ninja \
@@ -47,7 +52,7 @@ mkdir -p "$PREFIX/lib/shapely.libs"
 cp -f "$PREFIX/lib/libgeos.so" "$PREFIX/lib/shapely.libs/libgeos.so"
 cp -f "$PREFIX/lib/libgeos_c.so" "$PREFIX/lib/shapely.libs/libgeos_c.so"
 
-export LDFLAGS="-L$PREFIX/lib -Wl,-rpath,\$ORIGIN/.libs -Wl,-rpath,\$ORIGIN/shapely.libs -Wl,-rpath,\$ORIGIN"
+export LDFLAGS="-L$PREFIX/lib -L$(dirname "$PYLIB") -lpython3.13 -Wl,-rpath,\$ORIGIN/.libs -Wl,-rpath,\$ORIGIN/shapely.libs -Wl,-rpath,\$ORIGIN"
 
 cd "$ROOT"
 rm -rf shapely-src
@@ -86,6 +91,7 @@ export GEOS_INCLUDE_PATH="$PREFIX/include"
 export GEOS_LIBRARY_PATH="$PREFIX/lib/libgeos_c.so"
 export SHAPELY_GEOS_LIBRARY_PATH="$PREFIX/lib/libgeos_c.so"
 export SHAPELY_GEOS_INCLUDE_PATH="$PREFIX/include"
+export LDSHARED="$CC -shared $LDFLAGS"
 
 mkdir -p "$PWD/dist-host" "$PWD/wheel-fix"
 python3 setup.py bdist_wheel --plat-name android_24_arm64_v8a -d "$PWD/dist-host"
