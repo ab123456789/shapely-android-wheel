@@ -79,7 +79,10 @@ export GEOS_LIBRARY_PATH="$PREFIX/lib/libgeos_c.so"
 export SHAPELY_GEOS_LIBRARY_PATH="$PREFIX/lib/libgeos_c.so"
 export SHAPELY_GEOS_INCLUDE_PATH="$PREFIX/include"
 
-python3 -m pip wheel --no-deps --no-build-isolation -w "$PWD/dist-host" .
+mkdir -p "$PWD/dist-host"
+python3 setup.py bdist_wheel --plat-name android_24_arm64_v8a -d "$PWD/dist-host"
 ls -lah "$PWD/dist-host"
-find "$PWD/dist-host" -maxdepth 1 -type f -name '*.whl' -print -exec cp -f {} "$GITHUB_WORKSPACE/dist/" \;
+find "$PWD/dist-host" -maxdepth 1 -type f -name '*.whl' -print
+find "$PWD/dist-host" -maxdepth 1 -type f -name '*android_24_arm64_v8a.whl' -print -exec cp -f {} "$GITHUB_WORKSPACE/dist/" \;
 ls -lah "$GITHUB_WORKSPACE/dist"
+test -n "$(find "$GITHUB_WORKSPACE/dist" -maxdepth 1 -type f -name '*android_24_arm64_v8a.whl' -print -quit)"
