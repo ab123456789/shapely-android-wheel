@@ -1,0 +1,24 @@
+name: Build Shapely Android Wheel
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install deps
+        run: |
+          python -m pip install -U pip
+      - name: Build wheel
+        run: |
+          bash ./build_shapely_android.sh
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: shapely-wheel
+          path: dist/*
