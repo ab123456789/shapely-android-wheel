@@ -37,9 +37,17 @@ cmake -S . -B build-android -G Ninja \
   -DANDROID_PLATFORM="android-${API}" \
   -DBUILD_SHARED_LIBS=ON \
   -DCMAKE_INSTALL_PREFIX="$PREFIX" \
+  -DCMAKE_INSTALL_RPATH='\$ORIGIN' \
+  -DCMAKE_BUILD_WITH_INSTALL_RPATH=ON \
   -DBUILD_TESTING=OFF
 cmake --build build-android --parallel
 cmake --install build-android
+
+mkdir -p "$PREFIX/lib/shapely.libs"
+cp -f "$PREFIX/lib/libgeos.so" "$PREFIX/lib/shapely.libs/libgeos.so"
+cp -f "$PREFIX/lib/libgeos_c.so" "$PREFIX/lib/shapely.libs/libgeos_c.so"
+
+export LDFLAGS="-L$PREFIX/lib -Wl,-rpath,\$ORIGIN/.libs -Wl,-rpath,\$ORIGIN/shapely.libs -Wl,-rpath,\$ORIGIN"
 
 cd "$ROOT"
 rm -rf shapely-src
@@ -66,7 +74,7 @@ if '[build_ext]' not in text:
 for line in [
     'include_dirs=$PREFIX/include',
     'library_dirs=$PREFIX/lib',
-    'rpath=$PREFIX/lib',
+    'rpath=$ORIGIN/.libs:$ORIGIN/shapely.libs:$ORIGIN',
 ]:
     if line not in text:
         text += line + '\n'
@@ -96,9 +104,11 @@ with zipfile.ZipFile(whl) as z:
 for p in (root / 'shapely').glob('*.so'):
     if 'x86_64-linux-gnu' in p.name:
         p.rename(p.with_name(p.name.replace('x86_64-linux-gnu', 'aarch64-linux-android')))
+libs_dir = root / 'shapely.libs'
+libs_dir.mkdir(parents=True, exist_ok=True)
 for lib in [pathlib.Path("$PREFIX/lib/libgeos.so"), pathlib.Path("$PREFIX/lib/libgeos_c.so")]:
     if lib.exists():
-        shutil.copy2(lib, root / 'shapely' / lib.name)
+        shutil.copy2(lib, libs_dir / lib.name)
 out = pathlib.Path("$GITHUB_WORKSPACE/dist") / whl.name
 with zipfile.ZipFile(out, 'w', compression=zipfile.ZIP_DEFLATED) as z:
     for p in root.rglob('*'):
