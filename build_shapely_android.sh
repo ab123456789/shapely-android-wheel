@@ -7,7 +7,7 @@ ROOT="$PWD/.work"
 PREFIX="$ROOT/prefix"
 mkdir -p "$ROOT" "$PREFIX" dist
 
-python3 -m pip install -U pip wheel setuptools build packaging Cython
+python3 -m pip install -U pip wheel setuptools build packaging Cython numpy
 python3 -m pip download --no-binary=:all: --no-deps shapely==2.1.2 -d "$ROOT/src"
 python3 -m pip download --no-binary=:all: --no-deps numpy==2.4.4 -d "$ROOT/src"
 
@@ -63,8 +63,7 @@ export GEOS_LIBRARY_PATH="$PREFIX/lib/libgeos_c.so"
 export SHAPELY_GEOS_LIBRARY_PATH="$PREFIX/lib/libgeos_c.so"
 export SHAPELY_GEOS_INCLUDE_PATH="$PREFIX/include"
 
-python3 -m pip wheel --no-deps --no-build-isolation -w "$PWD/dist-host" . || true
-ls -lah "$PWD/dist-host" || true
-
-echo 'NOTE: current workflow is cross-build scaffolding; verify output tags in logs.'
+python3 -m pip wheel --no-deps --no-build-isolation -w "$PWD/dist-host" .
+ls -lah "$PWD/dist-host"
 find "$PWD/dist-host" -maxdepth 1 -type f -name '*.whl' -print -exec cp -f {} "$GITHUB_WORKSPACE/dist/" \;
+ls -lah "$GITHUB_WORKSPACE/dist"
