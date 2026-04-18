@@ -74,7 +74,7 @@ if '[build_ext]' not in text:
 for line in [
     'include_dirs=$PREFIX/include',
     'library_dirs=$PREFIX/lib',
-    'rpath=$ORIGIN/.libs:$ORIGIN/shapely.libs:$ORIGIN',
+    'rpath=\$ORIGIN/.libs:\$ORIGIN/shapely.libs:\$ORIGIN',
 ]:
     if line not in text:
         text += line + '\n'
