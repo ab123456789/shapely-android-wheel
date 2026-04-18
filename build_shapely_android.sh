@@ -79,10 +79,32 @@ export GEOS_LIBRARY_PATH="$PREFIX/lib/libgeos_c.so"
 export SHAPELY_GEOS_LIBRARY_PATH="$PREFIX/lib/libgeos_c.so"
 export SHAPELY_GEOS_INCLUDE_PATH="$PREFIX/include"
 
-mkdir -p "$PWD/dist-host"
+mkdir -p "$PWD/dist-host" "$PWD/wheel-fix"
 python3 setup.py bdist_wheel --plat-name android_24_arm64_v8a -d "$PWD/dist-host"
 ls -lah "$PWD/dist-host"
-find "$PWD/dist-host" -maxdepth 1 -type f -name '*.whl' -print
-find "$PWD/dist-host" -maxdepth 1 -type f -name '*android_24_arm64_v8a.whl' -print -exec cp -f {} "$GITHUB_WORKSPACE/dist/" \;
+WHL=$(find "$PWD/dist-host" -maxdepth 1 -type f -name '*android_24_arm64_v8a.whl' -print -quit)
+test -n "$WHL"
+python3 - <<PY
+import pathlib, shutil, zipfile
+root = pathlib.Path("$PWD/wheel-fix")
+if root.exists():
+    shutil.rmtree(root)
+root.mkdir(parents=True)
+whl = pathlib.Path("$WHL")
+with zipfile.ZipFile(whl) as z:
+    z.extractall(root)
+for p in (root / 'shapely').glob('*.so'):
+    if 'x86_64-linux-gnu' in p.name:
+        p.rename(p.with_name(p.name.replace('x86_64-linux-gnu', 'aarch64-linux-android')))
+for lib in [pathlib.Path("$PREFIX/lib/libgeos.so"), pathlib.Path("$PREFIX/lib/libgeos_c.so")]:
+    if lib.exists():
+        shutil.copy2(lib, root / 'shapely' / lib.name)
+out = pathlib.Path("$GITHUB_WORKSPACE/dist") / whl.name
+with zipfile.ZipFile(out, 'w', compression=zipfile.ZIP_DEFLATED) as z:
+    for p in root.rglob('*'):
+        if p.is_file():
+            z.write(p, p.relative_to(root))
+print(out)
+PY
 ls -lah "$GITHUB_WORKSPACE/dist"
 test -n "$(find "$GITHUB_WORKSPACE/dist" -maxdepth 1 -type f -name '*android_24_arm64_v8a.whl' -print -quit)"
